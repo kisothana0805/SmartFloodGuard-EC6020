@@ -1,5 +1,5 @@
 # SmartFloodGuard-EC6020
-IoT-Enabled Indoor Flood Entry Monitoring And Alerting System For Residential Safety
+"IoT-Enabled Indoor Flood Entry Monitoring And Alerting System For Residential Safety"
 
 🌊 SmartFloodGuard – EC6020
 
@@ -8,6 +8,7 @@ IoT-Enabled Indoor Flood Entry Monitoring And Alerting System For Residential Sa
 SmartFloodGuard is an IoT-enabled embedded system developed to detect indoor flood entry at an early stage and generate real-time alerts.
 The system integrates environmental sensors, microcontroller-based processing, RF communication, and WiFi connectivity to minimize residential damage caused by unexpected flooding.
 This project is developed under EC6020 – Embedded Systems Design.
+
 
 
 🚧 Current Status (MID Phase)
@@ -21,12 +22,16 @@ ESP32 WiFi configuration under development
 Preliminary circuit simulation completed in Proteus
 Initial web dashboard layout designed
 
+
+
 🏗️ Project Structure
+
 docs/        → Project proposal, presentations, and architecture diagrams  
 hardware/    → Circuit schematics and hardware design files  
 firmware/    → Embedded C source code for ATmega328  
 web_app/     → Web-based monitoring interface  
 testing/     → System validation and testing reports  
+
 
 
 🔧 Core Technologies
@@ -47,6 +52,7 @@ HTML / CSS / JavaScript
 GitHub Version Control
 
 
+
 👥 Team Members – Group 05
 2022/E/102 – Dangshan N. -
 2022/E/104 – Kisothana P.
@@ -54,6 +60,7 @@ GitHub Version Control
 2021/E/148 – Thilookshan S.
 2021/E/192 – Ajanthan T.
 2018/E/107 – Sarugesh R.
+
 
 
 📌 Course Information
