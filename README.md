@@ -1,67 +1,93 @@
-# SmartFloodGuard-EC6020
-"IoT-Enabled Indoor Flood Entry Monitoring And Alerting System For Residential Safety"
+# 🌊 SmartFloodGuard – EC6020
 
-🌊 SmartFloodGuard – EC6020
+**IoT-Enabled Indoor Flood Entry Monitoring And Alerting System For Residential Safety**
 
-📖 Introduction
+---
 
-SmartFloodGuard is an IoT-enabled embedded system developed to detect indoor flood entry at an early stage and generate real-time alerts.
-The system integrates environmental sensors, microcontroller-based processing, RF communication, and WiFi connectivity to minimize residential damage caused by unexpected flooding.
-This project is developed under EC6020 – Embedded Systems Design.
+## 📖 Introduction
 
+SmartFloodGuard is an IoT-enabled embedded system developed to detect indoor flood entry at an early stage and provide real-time alerts to homeowners. Indoor flooding can occur unexpectedly, especially during heavy rainfall, often causing severe damage to household items and electrical systems.
 
+This project integrates environmental sensors, microcontroller-based processing, RF wireless communication, and WiFi connectivity to ensure early detection and immediate notification. The system helps reduce property damage, improve safety, and enable remote monitoring through a web or mobile interface.
 
-🚧 Current Status (MID Phase)
+---
 
-Water level sensor interfacing completed
-ADC data acquisition implemented
-Local buzzer alert tested successfully
-RF communication between nodes established
-Relay control integration in progress
-ESP32 WiFi configuration under development
-Preliminary circuit simulation completed in Proteus
-Initial web dashboard layout designed
+## 🔌 Circuit Design
 
+The system is designed using a **two-node architecture** consisting of a Sensor Node and a Gateway Node.
 
+### 🔹 Sensor Node (Transmitter Unit)
 
-🏗️ Project Structure
+* Water Level Sensor – Detects presence of water
+* Ultrasonic Sensor (HC-SR04) – Measures water level height
+* ATmega328 Microcontroller – Processes sensor data
+* RF Transmitter (433 MHz) – Sends alert signal
+* 16 MHz Crystal Oscillator – Provides clock signal
+* AMS1117 Voltage Regulator – Ensures stable power supply
 
-docs/        → Project proposal, presentations, and architecture diagrams  
-hardware/    → Circuit schematics and hardware design files  
-firmware/    → Embedded C source code for ATmega328  
-web_app/     → Web-based monitoring interface  
-testing/     → System validation and testing reports  
+### 🔹 Gateway Node (Receiver Unit)
 
+* RF Receiver (433 MHz) – Receives transmitted signal
+* ATmega328 Microcontroller – Validates received data
+* ESP-01 WiFi Module (ESP8266) – Sends alert to cloud/web app
+* Buzzer – Provides local alert
+* LED – Visual indication of flood detection
 
+📌 Complete circuit diagrams are available in the **hardware/** directory.
 
-🔧 Core Technologies
+---
 
-Hardware:
-ATmega328 Microcontrollers
-Water Level Sensor
-Ultrasonic Sensor (HC-SR04)
-RF Transmitter & Receiver Modules
-ESP32 WiFi Module
-Buzzer & LED Indicators
+## 💻 Technologies Used
 
-Software:
-Embedded C
-AVR Toolchain
-RF Communication Protocol
-HTML / CSS / JavaScript
-GitHub Version Control
+### 🔧 Hardware
 
+* ATmega328 Microcontroller
+* Water Level Sensor Module
+* Ultrasonic Sensor (HC-SR04)
+* RF Transmitter & Receiver Modules (433 MHz)
+* ESP-01 WiFi Module (ESP8266)
+* AMS1117 Voltage Regulator
+* 16 MHz Crystal Oscillator
+* Buzzer and LED
+* Lithium-Ion Battery
 
+### 💻 Software
 
-👥 Team Members – Group 05
-2022/E/102 – Dangshan N. -
-2022/E/104 – Kisothana P.
-2021/E/117 – James P.S.V.
-2021/E/148 – Thilookshan S.
-2021/E/192 – Ajanthan T.
-2018/E/107 – Sarugesh R.
+* Embedded C / AVR Programming
+* Arduino IDE
+* ESP8266 WiFi Libraries
+* HTML, CSS, JavaScript (Web Interface)
+* GitHub Version Control
 
+---
 
+## 📚 References
 
-📌 Course Information
+* ATmega328 Datasheet – https://www.microchip.com
+* ESP8266 Documentation – https://www.espressif.com
+* Arduino Official Documentation – https://www.arduino.cc
+* HC-SR04 Ultrasonic Sensor Datasheet
+* IoT Web Development Resources
+
+---
+
+## 👥 Team & Mentors
+
+### 👨‍💻 Group 05 Members
+
+* 2022/E/102 – Dangshan N.
+* 2022/E/104 – Kisothana P.
+* 2021/E/117 – James P.S.V.
+* 2021/E/148 – Thilookshan S.
+* 2021/E/192 – Ajanthan T.
+* 2018/E/107 – Sarugesh R.
+
+### 🎓 Mentor / Supervisor
+
+* Thanuja Uruththirakodeeswaran
+
+---
+
+## 📌 Course Information
+
 EC6020 – Embedded Systems Design
