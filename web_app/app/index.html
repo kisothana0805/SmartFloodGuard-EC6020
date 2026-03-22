@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flood Monitor</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    body { background: #0b1220; }
+    .card { border: 0; border-radius: 16px; }
+    .soft { background: rgba(255,255,255,0.06); color: #e9eefc; }
+    .muted { color: rgba(233,238,252,0.75); }
+    .pill { padding: 8px 12px; border-radius: 999px; font-weight: 600; display: inline-block; }
+    .pill-safe { background: rgba(25, 135, 84, 0.25); color: #6ff3b6; }
+    .pill-danger { background: rgba(220, 53, 69, 0.25); color: #ff8a97; }
+    .pill-offline { background: rgba(255, 193, 7, 0.20); color: #ffd36b; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .table-darkish { --bs-table-bg: rgba(255,255,255,0.04); --bs-table-color: #e9eefc; }
+    .btn-round { border-radius: 14px; }
+    .modal-content { border: 1px solid rgba(255,255,255,0.10); }
+
+    /* Toggle buttons style */
+    .seg {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 6px;
+      display: inline-flex;
+      gap: 6px;
+    }
+    .seg button {
+      border-radius: 12px;
+      border: 0;
+      padding: 8px 12px;
+      background: transparent;
+      color: rgba(233,238,252,0.8);
+      font-weight: 600;
+    }
+    .seg button.active {
+      background: rgba(255,255,255,0.10);
+      color: #ffffff;
+    }
+
+    .chart-box {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 16px;
+      padding: 12px;
+      height: 260px;
+      position: relative;
+    }
+
+    .chart-box canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+  </style>
+</head>
+
+<body class="text-light">
+  <div class="container py-4" style="max-width: 980px;">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <h3 class="mb-0">Indoor Flood Monitor</h3>
+        <div class="muted">Device: <span class="mono" id="deviceIdLabel">DEV001</span></div>
+      </div>
+      <select class="form-select w-auto bg-dark text-light border-0" id="deviceSelect">
+        <option value="DEV001">DEV001</option>
+      </select>
+    </div>
+
+    <!-- Status row -->
+    <div class="row g-3 align-items-stretch">
+      <div class="col-12 col-lg-6">
+        <div class="card soft p-3 h-100 d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="muted">Current Status</div>
+              <div class="fs-4 fw-bold" id="statusText">Loading...</div>
+              <div class="mt-2">
+                <span class="pill" id="statusPill">...</span>
+              </div>
+            </div>
+            <div class="text-end">
+              <div class="muted">Last update</div>
+              <div class="mono" id="lastUpdate">--</div>
+              <div class="muted mt-1">Age</div>
+              <div class="mono" id="ageSec">--</div>
+            </div>
+          </div>
+
+          <div class="mt-auto">
+            <hr class="border-secondary my-3" />
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-outline-light btn-round" id="refreshBtn">Refresh</button>
+              <button class="btn btn-danger btn-round fw-semibold" id="resetBuzzerBtn">Reset Buzzer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card soft p-3 h-100">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="muted">Flood Height</div>
+            </div>
+            <div class="text-end">
+              <div class="muted">Humidity</div>
+              <div class="fw-bold fs-5">
+                <span id="humVal">--</span> <span class="muted">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-baseline gap-2">
+            <div class="display-6 fw-bold" id="heightVal">--</div>
+            <div class="muted">cm</div>
+          </div>
+
+          <div class="progress my-2" style="height: 12px; border-radius: 999px;">
+            <div class="progress-bar" role="progressbar" id="heightBar" style="width: 0%"></div>
+          </div>
+
+          <div class="d-flex justify-content-between muted small">
+            <span>0 cm</span>
+            <span>Max scale: <span id="maxScaleLabel">50</span> cm</span>
+          </div>
+
+          <hr class="border-secondary my-3" />
+
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="muted mb-0">Drip System</div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="pill pill-offline" id="dripPill">...</span>
+              <span class="fw-semibold" id="dripText">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs / Graphs -->
+    <div class="card soft p-3 mt-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <div class="fs-5 fw-semibold">Past Activities</div>
+          <div class="muted small">Toggle between Table and Graphs</div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <select class="form-select bg-dark text-light border-0" id="limitSelect">
+            <option value="20">Last 20</option>
+            <option value="50" selected>Last 50</option>
+            <option value="100">Last 100</option>
+            <option value="200">Last 200</option>
+          </select>
+
+          <div class="seg">
+            <button id="viewTableBtn" class="active" type="button">Table View</button>
+            <button id="viewGraphBtn" type="button">Graph View</button>
+          </div>
+
+          <button class="btn btn-success btn-round fw-semibold" id="exportBtn">Export PDF</button>
+          <button class="btn btn-outline-light btn-round" id="loadLogsBtn">Load</button>
+        </div>
+      </div>
+
+      <!-- TABLE VIEW -->
+      <div id="tableView" class="mt-3">
+        <div class="table-responsive">
+          <table class="table table-darkish table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date/Time</th>
+                <th>Flood</th>
+                <th>Height (cm)</th>
+                <th>Humidity (%)</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody">
+              <tr><td colspan="5" class="muted">No logs yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- GRAPH VIEW -->
+      <div id="graphView" class="mt-3" style="display:none;">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="chart-box">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">Flood Height (cm)</div>
+                <div class="muted small mono" id="heightNowLabel">--</div>
+              </div>
+              <canvas id="heightChart"></canvas>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="chart-box">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">Humidity (%)</div>
+                <div class="muted small mono" id="humNowLabel">--</div>
+              </div>
+              <canvas id="humChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="muted small mt-3">
+      Tip: open this page on your phone using your laptop IP address to make it feel like a real mobile app.
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-light" style="border-radius: 16px;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title">Export Logs as PDF</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-2 muted">Choose time range</div>
+
+          <label class="form-label">From</label>
+          <input type="datetime-local" class="form-control bg-black text-light border-secondary" id="exportFrom">
+
+          <label class="form-label mt-3">To</label>
+          <input type="datetime-local" class="form-control bg-black text-light border-secondary" id="exportTo">
+
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="exportFloodOnly">
+            <label class="form-check-label" for="exportFloodOnly">
+              Export only flood events
+            </label>
+          </div>
+
+          <div class="muted small mt-2">
+            Note: Max 2000 rows per export (safety limit).
+          </div>
+        </div>
+
+        <div class="modal-footer border-secondary">
+          <button class="btn btn-outline-light btn-round" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-success btn-round fw-semibold" id="exportDoBtn">Download PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (needed for modal) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const API_BASE = "/flood_monitor/api";
+    let deviceId = "DEV001";
+    const MAX_HEIGHT_SCALE = 50;
+
+    const el = (id) => document.getElementById(id);
+
+    function setPill(type, text) {
+      const p = el("statusPill");
+      p.className = "pill";
+      if (type === "safe") p.classList.add("pill-safe");
+      if (type === "danger") p.classList.add("pill-danger");
+      if (type === "offline") p.classList.add("pill-offline");
+      p.textContent = text;
+    }
+
+    function secondsSince(ts) {
+      const t = new Date(ts).getTime();
+      const now = Date.now();
+      return Math.max(0, Math.floor((now - t) / 1000));
+    }
+
+    async function fetchLatest() {
+      const url = `${API_BASE}/get_latest.php?device_id=${encodeURIComponent(deviceId)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      return json.data;
+    }
+
+    async function fetchHistory(limit) {
+      const url = `${API_BASE}/get_history.php?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      return json.data || [];
+    }
+
+    function renderLatest(d) {
+      if (!d) {
+        el("statusText").textContent = "No data";
+        setPill("offline", "NO DATA");
+
+        el("heightVal").textContent = "--";
+        el("humVal").textContent = "--";
+        el("lastUpdate").textContent = "--";
+        el("ageSec").textContent = "--";
+        el("heightBar").style.width = "0%";
+        el("maxScaleLabel").textContent = MAX_HEIGHT_SCALE;
+
+        el("dripPill").className = "pill pill-offline";
+        el("dripPill").textContent = "...";
+        el("dripText").textContent = "No data";
+        return;
+      }
+
+      const age = secondsSince(d.created_at);
+      el("lastUpdate").textContent = d.created_at.replace(" ", "  ");
+      el("ageSec").textContent = `${age}s`;
+
+      const flood = parseInt(d.flood_detected ?? 0) === 1;
+      const height = Number(d.height_cm ?? 0);
+      const hum = (d.humidity === null || d.humidity === undefined) ? "--" : Number(d.humidity).toFixed(1);
+      const drip = parseInt(d.drip_triggered ?? 0) === 1;
+
+      el("heightVal").textContent = height.toFixed(1);
+      el("humVal").textContent = hum;
+
+      const pct = Math.max(0, Math.min(100, (height / MAX_HEIGHT_SCALE) * 100));
+      el("heightBar").style.width = pct + "%";
+      el("maxScaleLabel").textContent = MAX_HEIGHT_SCALE;
+
+      // offline rule: if no update for 10 sec
+      if (age > 10) {
+        el("statusText").textContent = "Device Offline";
+        setPill("offline", "OFFLINE");
+
+        el("dripPill").className = "pill pill-offline";
+        el("dripPill").textContent = "...";
+        el("dripText").textContent = "No data";
+        return;
+      }
+
+      if (flood) {
+        el("statusText").textContent = "Flood Detected";
+        setPill("danger", "ALERT");
+      } else {
+        el("statusText").textContent = "Safe";
+        setPill("safe", "SAFE");
+      }
+
+      if (drip) {
+        el("dripPill").className = "pill pill-danger";
+        el("dripPill").textContent = "TRIGGERED";
+        el("dripText").textContent = "Triggered";
+      } else {
+        el("dripPill").className = "pill pill-safe";
+        el("dripPill").textContent = "INACTIVE";
+        el("dripText").textContent = "Inactive";
+      }
+    }
+
+    function renderLogs(rows) {
+      const tbody = el("logsBody");
+      tbody.innerHTML = "";
+
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">No logs yet.</td></tr>`;
+        return;
+      }
+
+      rows.forEach((r, idx) => {
+        const flood = parseInt(r.flood_detected) === 1 ? "YES" : "NO";
+        const hum = (r.humidity === null || r.humidity === undefined) ? "--" : Number(r.humidity).toFixed(1);
+        const h = Number(r.height_cm ?? 0).toFixed(1);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono">${idx + 1}</td>
+          <td class="mono">${r.created_at}</td>
+          <td>${flood}</td>
+          <td>${h}</td>
+          <td>${hum}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function refreshAll() {
+      try {
+        const latest = await fetchLatest();
+        renderLatest(latest);
+      } catch (e) {
+        el("statusText").textContent = "Error loading";
+        setPill("offline", "ERROR");
+      }
+    }
+
+    async function loadLogsAndCharts() {
+      const limit = parseInt(el("limitSelect").value);
+      const rows = await fetchHistory(limit);
+      renderLogs(rows);
+      updateCharts(rows);
+    }
+
+    // ---------------------------
+    // Reset buzzer command
+    // ---------------------------
+    async function sendCommand(command, payload = null) {
+      const res = await fetch(`${API_BASE}/send_command.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId, command, payload })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Command failed");
+      return json;
+    }
+
+    el("resetBuzzerBtn").addEventListener("click", async () => {
+      const ok = confirm("Reset / Stop the buzzer now?");
+      if (!ok) return;
+
+      try {
+        const out = await sendCommand("BUZZER_RESET", { pulse_ms: 500 });
+        alert(`Reset command sent ✅ (ID: ${out.command_id})`);
+      } catch (e) {
+        alert(`Failed ❌: ${e.message}`);
+      }
+    });
+
+    // ---------------------------
+    // Export PDF modal logic
+    // ---------------------------
+    const exportModal = new bootstrap.Modal(document.getElementById("exportModal"));
+
+    function pad2(n){ return String(n).padStart(2,"0"); }
+    function toDatetimeLocalString(d){
+      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    el("exportBtn").addEventListener("click", () => {
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60*60*1000);
+
+      el("exportFrom").value = toDatetimeLocalString(oneHourAgo);
+      el("exportTo").value = toDatetimeLocalString(now);
+      el("exportFloodOnly").checked = false;
+
+      exportModal.show();
+    });
+
+    el("exportDoBtn").addEventListener("click", () => {
+      const from = el("exportFrom").value;
+      const to = el("exportTo").value;
+      const floodOnly = el("exportFloodOnly").checked ? 1 : 0;
+
+      if (!from || !to) {
+        alert("Please select both From and To times.");
+        return;
+      }
+
+      const url = `${API_BASE}/export_logs_pdf.php?device_id=${encodeURIComponent(deviceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&flood_only=${floodOnly}`;
+      window.location.href = url;
+    });
+
+    // ---------------------------
+    // Toggle: Table / Graph
+    // ---------------------------
+    function setView(mode) {
+      const table = el("tableView");
+      const graph = el("graphView");
+      const b1 = el("viewTableBtn");
+      const b2 = el("viewGraphBtn");
+
+      if (mode === "table") {
+        table.style.display = "block";
+        graph.style.display = "none";
+        b1.classList.add("active");
+        b2.classList.remove("active");
+      } else {
+        table.style.display = "none";
+        graph.style.display = "block";
+        b2.classList.add("active");
+        b1.classList.remove("active");
+      }
+    }
+
+    el("viewTableBtn").addEventListener("click", () => setView("table"));
+    el("viewGraphBtn").addEventListener("click", () => setView("graph"));
+
+    // ---------------------------
+    // Charts (Real-time from backend)
+    // ---------------------------
+    let heightChart = null;
+    let humChart = null;
+
+    function buildCharts() {
+      // Common chart options (grid + nice ticks)
+      const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: { color: "rgba(233,238,252,0.75)", maxRotation: 0, autoSkip: true },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          },
+          y: {
+            ticks: { color: "rgba(233,238,252,0.75)" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true
+          }
+        },
+        elements: {
+          line: { tension: 0.35, borderWidth: 2 },
+          point: { radius: 0, hitRadius: 8 }
+        }
+      };
+
+      // Height chart
+      const hctx = document.getElementById("heightChart");
+      heightChart = new Chart(hctx, {
+        type: "line",
+        data: { labels: [], datasets: [{ data: [] }] },
+        options: { ...commonOpts }
+      });
+
+      // Humidity chart (blue)
+      const uctx = document.getElementById("humChart");
+      humChart = new Chart(uctx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            borderColor: "#4da3ff",
+            backgroundColor: "rgba(77,163,255,0.15)"
+          }]
+        },
+        options: { ...commonOpts }
+      });
+    }
+
+    function updateCharts(rows) {
+      if (!heightChart || !humChart) return;
+
+      // rows from API are newest->oldest usually; we want oldest->newest
+      const data = [...rows].reverse();
+
+      const labels = data.map(r => {
+        // show only HH:MM:SS for clean chart
+        const t = (r.created_at || "").split(" ")[1] || r.created_at;
+        return t;
+      });
+
+      const heights = data.map(r => Number(r.height_cm ?? 0));
+      const hums = data.map(r => Number(r.humidity ?? 0));
+
+      // Live labels
+      const lastH = heights.length ? heights[heights.length - 1] : 0;
+      const lastU = hums.length ? hums[hums.length - 1] : 0;
+      el("heightNowLabel").textContent = `Now: ${lastH.toFixed(1)} cm`;
+      el("humNowLabel").textContent = `Now: ${lastU.toFixed(1)} %`;
+
+      // Height color logic:
+      // green if latest height == 0, else red
+      const heightColor = (lastH <= 0.001) ? "#3dff9a" : "#ff4d5a";
+      const heightFill  = (lastH <= 0.001) ? "rgba(61,255,154,0.15)" : "rgba(255,77,90,0.15)";
+
+      heightChart.data.labels = labels;
+      heightChart.data.datasets[0].data = heights;
+      heightChart.data.datasets[0].borderColor = heightColor;
+      heightChart.data.datasets[0].backgroundColor = heightFill;
+
+      humChart.data.labels = labels;
+      humChart.data.datasets[0].data = hums;
+
+      heightChart.update("none");
+      humChart.update("none");
+    }
+
+    // ---------------------------
+    // UI events
+    // ---------------------------
+    el("deviceSelect").addEventListener("change", async (e) => {
+      deviceId = e.target.value;
+      el("deviceIdLabel").textContent = deviceId;
+      await refreshAll();
+      await loadLogsAndCharts();
+    });
+
+    el("refreshBtn").addEventListener("click", refreshAll);
+    el("loadLogsBtn").addEventListener("click", loadLogsAndCharts);
+
+    // start
+    buildCharts();
+    setView("table");         // default view
+    refreshAll();
+    loadLogsAndCharts();
+
+    setInterval(refreshAll, 500);
+    setInterval(loadLogsAndCharts, 3000);
+  </script>
+
+  <script>
+    // Register Service Worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("Service Worker registered ✅"))
+        .catch((err) => console.log("SW failed ❌", err));
+    }
+  </script>
+</body>
+</html>
