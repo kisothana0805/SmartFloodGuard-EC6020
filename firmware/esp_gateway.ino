@@ -6,14 +6,17 @@ HardwareSerial mySerial(1);
 
 #define RX_PIN 16
 #define TX_PIN 17
+#define RESET_OUT_PIN 25   // ESP32 -> AND gate input, active LOW reset pulse
 
 // Wi-Fi
-const char* ssid = "YOUR_WIFI_NAME";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "Share";
+const char* password = "ajyaga2712";
 
 // Backend
-const char* serverUrl = "http://192.168.8.103/flood_monitor/api/push_reading.php";
-const char* deviceId  = "DEV001";
+const char* serverUrl      = "http://10.191.31.209/flood_monitor/api/push_reading.php";
+const char* pullCommandUrl = "http://10.191.31.209/flood_monitor/api/pull_command.php?device_id=DEV001";
+const char* ackCommandUrl  = "http://10.191.31.209/flood_monitor/api/ack_command.php";
+const char* deviceId       = "DEV001";
 
 // Latest UART values
 volatile int latestDepth = 0;
@@ -30,6 +33,9 @@ int sentRelay = -9999;
 // Timing
 unsigned long lastPostMs = 0;
 const unsigned long postIntervalMs = 250;
+
+unsigned long lastCommandPollMs = 0;
+const unsigned long commandPollIntervalMs = 300;
 
 // UART line buffer
 String serialBuffer = "";
@@ -122,11 +128,122 @@ bool stateChangedEnough() {
 }
 
 // -------------------------------------------------
+int extractJsonInt(const String &json, const String &key) {
+  String token = "\"" + key + "\":";
+  int start = json.indexOf(token);
+  if (start == -1) return -1;
+
+  start += token.length();
+  while (start < json.length() && (json[start] == ' ' || json[start] == '\"')) start++;
+
+  int end = start;
+  if (start < json.length() && json[start] == '-') end++;
+
+  while (end < json.length() && isDigit(json[end])) end++;
+
+  if (end <= start) return -1;
+  return json.substring(start, end).toInt();
+}
+
+String extractJsonString(const String &json, const String &key) {
+  String token = "\"" + key + "\":\"";
+  int start = json.indexOf(token);
+  if (start == -1) return "";
+
+  start += token.length();
+  int end = json.indexOf("\"", start);
+  if (end == -1) return "";
+
+  return json.substring(start, end);
+}
+
+// -------------------------------------------------
+void ackCommand(int commandId, const String &status, const String &message) {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
+
+  String json = "{";
+  json += "\"command_id\":" + String(commandId) + ",";
+  json += "\"status\":\"" + status + "\",";
+  json += "\"message\":\"" + message + "\"";
+  json += "}";
+
+  HTTPClient http;
+  http.setTimeout(500);
+  http.begin(ackCommandUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  int code = http.POST(json);
+  http.end();
+
+  Serial.print("ACK code: ");
+  Serial.println(code);
+}
+
+// -------------------------------------------------
+// Active-LOW reset pulse for AND gate logic
+void pulseResetOutput() {
+  Serial.println("Sending LOW reset pulse on GPIO25...");
+  digitalWrite(RESET_OUT_PIN, LOW);   // trigger reset
+  delay(300);                         // 300 ms pulse
+  digitalWrite(RESET_OUT_PIN, HIGH);  // back to idle
+  Serial.println("Reset pulse done.");
+}
+
+// -------------------------------------------------
+void checkCommands() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
+
+  HTTPClient http;
+  http.setTimeout(400);
+  http.begin(pullCommandUrl);
+
+  int code = http.GET();
+  if (code <= 0) {
+    http.end();
+    return;
+  }
+
+  String response = http.getString();
+  http.end();
+
+  if (response.indexOf("\"data\":null") != -1) {
+    return;
+  }
+
+  int commandId = extractJsonInt(response, "id");
+  String command = extractJsonString(response, "command");
+
+  if (commandId <= 0 || command == "") {
+    return;
+  }
+
+  Serial.print("Command received: ");
+  Serial.print(command);
+  Serial.print(" (ID=");
+  Serial.print(commandId);
+  Serial.println(")");
+
+  if (command == "BUZZER_RESET") {
+    pulseResetOutput();
+    ackCommand(commandId, "EXECUTED", "LOW reset pulse sent from ESP32");
+  } else {
+    ackCommand(commandId, "FAILED", "Unknown command");
+  }
+}
+
+// -------------------------------------------------
 void setup() {
   Serial.begin(9600);
 
   mySerial.setRxBufferSize(1024);
   mySerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
+
+  pinMode(RESET_OUT_PIN, OUTPUT);
+  digitalWrite(RESET_OUT_PIN, HIGH);   // idle HIGH for active-LOW reset logic
 
   connectWiFi();
 
@@ -136,6 +253,7 @@ void setup() {
   sentWater = 0;
   sentRelay = 0;
   lastPostMs = millis();
+  lastCommandPollMs = millis();
 }
 
 // -------------------------------------------------
@@ -144,6 +262,7 @@ void loop() {
 
   unsigned long now = millis();
 
+  // Existing sensor update logic unchanged
   if (stateChangedEnough() && (now - lastPostMs >= postIntervalMs)) {
     sendToServer(latestDepth, latestHumidity, latestWater, latestRelay);
 
@@ -157,5 +276,11 @@ void loop() {
   if ((now - lastPostMs) >= 2000) {
     sendToServer(latestDepth, latestHumidity, latestWater, latestRelay);
     lastPostMs = now;
+  }
+
+  // Command polling for reset button
+  if ((now - lastCommandPollMs) >= commandPollIntervalMs) {
+    checkCommands();
+    lastCommandPollMs = now;
   }
 }
